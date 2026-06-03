@@ -26,7 +26,7 @@ Same remote model as the GitHub provider:
   `.stash/` files stay local-only.
 - Each sync cycle advances the branch with the changed content + snapshot.
 
-**Out of scope:** Bitbucket *Cloud* (different API, OAuth, different host) —
+**Out of scope:** Bitbucket _Cloud_ (different API, OAuth, different host) —
 that is a separate future provider. Pull-request / branch workflows. Anything
 beyond transport (no merging/reconciliation — Stash owns that).
 
@@ -36,13 +36,13 @@ beyond transport (no merging/reconciliation — Stash owns that).
 
 From reading the codebase, wiring a new provider is small and mechanical:
 
-| Concern | Mechanism |
-|---|---|
-| Contract | `implements Provider` from `src/types.ts` — `fetch`, `get`, `push` |
-| CLI prompts | static `spec: ProviderSpec` (`setup` = global, `connect` = per-stash) |
-| Construction | `constructor(config: Record<string, string>)` — merged setup+connect, flat |
-| Registration | one line in `src/providers/index.ts`: `bitbucket-dc: BitbucketDataCenterProvider` |
-| Conflict signal | throw `PushConflictError` from `src/errors.ts` |
+| Concern         | Mechanism                                                                         |
+| --------------- | --------------------------------------------------------------------------------- |
+| Contract        | `implements Provider` from `src/types.ts` — `fetch`, `get`, `push`                |
+| CLI prompts     | static `spec: ProviderSpec` (`setup` = global, `connect` = per-stash)             |
+| Construction    | `constructor(config: Record<string, string>)` — merged setup+connect, flat        |
+| Registration    | one line in `src/providers/index.ts`: `bitbucket-dc: BitbucketDataCenterProvider` |
+| Conflict signal | throw `PushConflictError` from `src/errors.ts`                                    |
 
 `cli-main.ts:getProvider()` looks the class up in the registry and the
 CLI derives `stash setup` / `stash connect` prompts straight from `spec`.
@@ -60,18 +60,18 @@ Stash's job.
 The GitHub provider leans on two GitHub-only conveniences that **do not exist**
 in Bitbucket DC's REST 1.0 API. This is the crux of the work.
 
-| Capability | GitHub provider uses | Bitbucket DC equivalent |
-|---|---|---|
-| Branch head + tree | `GET /repos/{o}/{r}/branches/main` | `GET /rest/api/1.0/projects/{K}/repos/{S}/branches/default` → `latestCommit` |
-| Read snapshot file | `GET /contents/.stash/snapshot.json` (base64) | `GET .../raw/.stash/snapshot.json?at={ref}` (raw bytes) |
-| Batch text read | **GraphQL** `object(expression).text/isBinary` | ❌ none → **N parallel raw GETs** + `isValidText()` |
-| Raw bytes | `GET /contents/{path}` raw media type | `GET .../raw/{path}?at={ref}` |
-| List all files | `GET /git/trees/{sha}?recursive=1` | `GET .../files/{path}?at={ref}&start&limit` (**paginated**) |
-| Atomic multi-file commit | `git/blobs` → `git/trees` → `git/commits` → move ref | ❌ **none** → per-file `PUT .../browse/{path}` |
-| Per-write conflict check | n/a (atomic) | `sourceCommitId` form field on `browse` PUT → 409 on race |
-| Ref-race detection | compare `main` head SHA before/after | compare default-branch `latestCommit` before/after |
-| Auth | `Authorization: token …` (REST), `bearer …` (GraphQL) | `Authorization: Bearer <HTTP access token>` |
-| Rate limit | `403` + `x-ratelimit-remaining: 0` | `429` + `Retry-After` (DC throttling) |
+| Capability               | GitHub provider uses                                  | Bitbucket DC equivalent                                                      |
+| ------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Branch head + tree       | `GET /repos/{o}/{r}/branches/main`                    | `GET /rest/api/1.0/projects/{K}/repos/{S}/branches/default` → `latestCommit` |
+| Read snapshot file       | `GET /contents/.stash/snapshot.json` (base64)         | `GET .../raw/.stash/snapshot.json?at={ref}` (raw bytes)                      |
+| Batch text read          | **GraphQL** `object(expression).text/isBinary`        | ❌ none → **N parallel raw GETs** + `isValidText()`                          |
+| Raw bytes                | `GET /contents/{path}` raw media type                 | `GET .../raw/{path}?at={ref}`                                                |
+| List all files           | `GET /git/trees/{sha}?recursive=1`                    | `GET .../files/{path}?at={ref}&start&limit` (**paginated**)                  |
+| Atomic multi-file commit | `git/blobs` → `git/trees` → `git/commits` → move ref  | ❌ **none** → per-file `PUT .../browse/{path}`                               |
+| Per-write conflict check | n/a (atomic)                                          | `sourceCommitId` form field on `browse` PUT → 409 on race                    |
+| Ref-race detection       | compare `main` head SHA before/after                  | compare default-branch `latestCommit` before/after                           |
+| Auth                     | `Authorization: token …` (REST), `bearer …` (GraphQL) | `Authorization: Bearer <HTTP access token>`                                  |
+| Rate limit               | `403` + `x-ratelimit-remaining: 0`                    | `429` + `Retry-After` (DC throttling)                                        |
 
 ### Consequences for `push()`
 
@@ -184,6 +184,7 @@ the provider is registered (Iteration 9) only once it's real, so partial work
 never reaches the CLI.
 
 ### Iteration 0 — Harness & stub
+
 - **Red:** rename `MockGitHubAPI` → `MockHttpAPI` (keep alias); add
   `bitbucket-datacenter-provider.test.ts` with one constructor test.
 - **Green:** create `BitbucketDataCenterProvider` skeleton — class implementing
@@ -193,6 +194,7 @@ never reaches the CLI.
   constructor test runs (red→green next iteration).
 
 ### Iteration 1 — Constructor + `spec` validation
+
 - **Red:** tests for missing token, missing/garbage `baseUrl`, missing
   `project`/`repo`, and `baseUrl` normalization (trailing slash, pasted
   `/rest/api/1.0`). Assert `spec.setup`/`spec.connect` field names.
@@ -200,6 +202,7 @@ never reaches the CLI.
   `baseUrl`, `token`, `project`, `repo`.
 
 ### Iteration 2 — REST plumbing (private)
+
 - **Red:** tests for the request helper — sends `Authorization: Bearer`,
   `Accept: application/json`, correct `X-Atlassian`/User-Agent headers; maps
   `401`→auth error, `403`→permission error, `429`→rate-limit error surfacing
@@ -209,12 +212,14 @@ never reaches the CLI.
   `paginate()` mirroring the GitHub provider's private helpers.
 
 ### Iteration 3 — `fetch()`: empty / uninitialized repo
+
 - **Red:** `branches/default` → 404 (or empty repo) returns
   `{ added:{}, modified:{}, deleted:[] }`. Mirror the GitHub "empty repo"
   test exactly.
 - **Green:** capture-and-bail logic; reset cached head/branch.
 
 ### Iteration 4 — `fetch()`: remote snapshot diff
+
 - **Red:** snapshot exists; diff vs `localSnapshot` for added / modified /
   deleted; binary entries (have `modified`) classified from snapshot metadata
   without a content fetch; changed **text** fetched via parallel
@@ -226,17 +231,20 @@ never reaches the CLI.
   `isValidText`.
 
 ### Iteration 5 — `fetch()`: no remote snapshot (first sync from another client)
+
 - **Red:** no `.stash/snapshot.json`; recursive `files` listing (paginated,
   `.stash/` excluded) returns all paths as `added`; classify each via raw +
   `isValidText`. Mirror GitHub's "first sync returns all added".
 - **Green:** implement listing + classification path. Exercise `paginate()`.
 
 ### Iteration 6 — `get()`
+
 - **Red:** streams one binary file's bytes from `raw/{path}` as a `Readable`;
   surfaces 404/error.
 - **Green:** thin wrapper over the raw fetch returning `Readable.from(bytes)`.
 
 ### Iteration 7 — `push()`: text happy path + bootstrap
+
 - **Red:** writes each text file via `browse` PUT with `message`,
   `branch=<defaultDisplayId>`, `sourceCommitId=<captured head>`; writes
   `.stash/snapshot.json` **last**; empty-repo bootstrap creates the initial
@@ -246,6 +254,7 @@ never reaches the CLI.
 - **Green:** implement sequential writes + bootstrap.
 
 ### Iteration 8 — `push()`: binaries, deletions, conflicts ⚠️
+
 - **Resolve S1 (deletion) and S2 (binary encoding) first** — capture findings
   in §3.
 - **Red:** binary file thunks streamed and uploaded; deletions applied via the
@@ -256,6 +265,7 @@ never reaches the CLI.
 - **Green:** implement binary upload, deletion, and conflict mapping.
 
 ### Iteration 9 — Registration + integration test
+
 - **Red:** integration test mirroring `github-provider.integration.test.ts`
   (full fetch→push→fetch round-trip on the mock).
 - **Green:** add `"bitbucket-dc": BitbucketDataCenterProvider` to
@@ -263,6 +273,7 @@ never reaches the CLI.
   the CLI derives prompts from `spec` (a small `cli-main` smoke assertion).
 
 ### Iteration 10 — Docs + green gate
+
 - Write `docs/providers/bitbucket-datacenter.md` mirroring `github.md`
   (remote model, config, auth, fetch/get/push flow, error model, the
   non-atomic-push + snapshot-last note).
@@ -275,16 +286,16 @@ never reaches the CLI.
 
 ## 7. File-by-file change list
 
-| File | Change |
-|---|---|
-| `src/providers/bitbucket-datacenter-provider.ts` | **new** — the provider |
-| `src/providers/index.ts` | register `bitbucket-dc` (Iteration 9) |
-| `tests/helpers/mock-github-api.ts` → `mock-http-api.ts` | rename to `MockHttpAPI`, keep `MockGitHubAPI` alias |
-| `tests/unit/bitbucket-datacenter-provider.test.ts` | **new** — unit suite |
-| `tests/integration/bitbucket-datacenter-provider.integration.test.ts` | **new** — round-trip |
-| `tests/e2e/…` (optional) | env-gated live-instance suite |
-| `docs/providers/bitbucket-datacenter.md` | **new** — mirror `github.md` |
-| `docs/providers/overview.md` | link the new provider |
+| File                                                                  | Change                                              |
+| --------------------------------------------------------------------- | --------------------------------------------------- |
+| `src/providers/bitbucket-datacenter-provider.ts`                      | **new** — the provider                              |
+| `src/providers/index.ts`                                              | register `bitbucket-dc` (Iteration 9)               |
+| `tests/helpers/mock-github-api.ts` → `mock-http-api.ts`               | rename to `MockHttpAPI`, keep `MockGitHubAPI` alias |
+| `tests/unit/bitbucket-datacenter-provider.test.ts`                    | **new** — unit suite                                |
+| `tests/integration/bitbucket-datacenter-provider.integration.test.ts` | **new** — round-trip                                |
+| `tests/e2e/…` (optional)                                              | env-gated live-instance suite                       |
+| `docs/providers/bitbucket-datacenter.md`                              | **new** — mirror `github.md`                        |
+| `docs/providers/overview.md`                                          | link the new provider                               |
 
 **Reused unchanged:** `src/types.ts` (contract is sufficient), `src/errors.ts`
 (`PushConflictError`), `src/utils/hash.ts` (`hashBuffer`), `src/utils/text.ts`
@@ -311,11 +322,11 @@ local scanning, satisfying the contract's anti-ping-pong constraint).
 
 ## 9. Risk register
 
-| # | Risk | Likelihood | Mitigation |
-|---|---|---|---|
-| R1 | No REST file-delete (S1) | High | Spike early in Iter 8; may need version-specific endpoint or alternative |
-| R2 | Non-atomic multi-file push | Certain | Snapshot-last ordering → self-healing; document the window |
-| R3 | Default branch ≠ `main` (S3) | Medium | Resolve via `branches/default`, never hardcode |
-| R4 | Pagination envelope drift across DC versions (S4) | Medium | Centralize in `paginate()`; assert against target version |
-| R5 | Rate-limit shape differs from GitHub | Medium | Map `429` + `Retry-After` explicitly in Iter 2 |
-| R6 | No CI access to a live DC instance | High | E2E env-gated/skippable; unit+integration via mock carry correctness |
+| #   | Risk                                              | Likelihood | Mitigation                                                               |
+| --- | ------------------------------------------------- | ---------- | ------------------------------------------------------------------------ |
+| R1  | No REST file-delete (S1)                          | High       | Spike early in Iter 8; may need version-specific endpoint or alternative |
+| R2  | Non-atomic multi-file push                        | Certain    | Snapshot-last ordering → self-healing; document the window               |
+| R3  | Default branch ≠ `main` (S3)                      | Medium     | Resolve via `branches/default`, never hardcode                           |
+| R4  | Pagination envelope drift across DC versions (S4) | Medium     | Centralize in `paginate()`; assert against target version                |
+| R5  | Rate-limit shape differs from GitHub              | Medium     | Map `429` + `Retry-After` explicitly in Iter 2                           |
+| R6  | No CI access to a live DC instance                | High       | E2E env-gated/skippable; unit+integration via mock carry correctness     |
