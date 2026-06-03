@@ -2,7 +2,7 @@
 
 A provider is a remote transport for Stash. It knows how to fetch, stream, and push files to a remote storage backend. It does not merge files, resolve conflicts, or touch local disk — Stash handles all of that.
 
-The only built-in provider is [GitHub](github.md). This document defines the contract any provider must satisfy and how to build a new one.
+The built-in providers are [GitHub](github.md) and [Bitbucket Data Center](bitbucket-datacenter.md). This document defines the contract any provider must satisfy and how to build a new one.
 
 ## How sync uses providers
 
@@ -213,9 +213,7 @@ export class MyProvider implements Provider {
     // e.g. { token: "...", "remote-id": "..." }
   }
 
-  async fetch(
-    localSnapshot?: Record<string, SnapshotEntry>,
-  ): Promise<ChangeSet> {
+  async fetch(localSnapshot?: Record<string, SnapshotEntry>): Promise<ChangeSet> {
     // 1. Load .stash/snapshot.json from the remote.
     // 2. If no remote snapshot exists (first sync from another client),
     //    list all remote files and return them as added.
