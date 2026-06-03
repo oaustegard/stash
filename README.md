@@ -45,6 +45,14 @@ stash start
 
 Alternatively, a classic token with the `repo` scope also works.
 
+### Using Bitbucket Data Center
+
+Prefer a self-hosted **Bitbucket Data Center** (formerly Bitbucket Server) repo
+instead of GitHub? Follow the
+[Bitbucket Data Center setup guide](docs/providers/bitbucket-datacenter-setup.md) —
+it walks through creating an HTTP access token, `stash setup bitbucket-dc`, and
+`stash connect bitbucket-dc`. (Bitbucket _Cloud_ is not supported.)
+
 ## How it works
 
 A stash is a folder with a `.stash/` directory that stores connection config and a snapshot of the last-synced file state. On each sync, Stash scans local files, fetches remote changes, and reconciles both sides using a version of Google's [diff-match-patch](https://github.com/google/diff-match-patch) algorithm (the same one used by Obsidian Sync). In watch or background mode, this runs whenever a file changes or every 30 seconds.
@@ -58,7 +66,7 @@ A stash is a folder with a `.stash/` directory that stores connection config and
 - **Smart text merging.** Edits to different regions combine cleanly. Overlapping edits preserve both sides instead of silently dropping content.
 - **Binary files** use last-modified-wins.
 - **Automatic tracking.** Every file in the directory is synced except dotfiles, dot-directories, symlinks, and `.stash/` metadata.
-- **Provider-agnostic.** GitHub is the built-in provider, but the transport layer is pluggable. See [docs/providers/overview.md](docs/providers/overview.md).
+- **Provider-agnostic.** GitHub and [Bitbucket Data Center](docs/providers/bitbucket-datacenter-setup.md) are the built-in providers, and the transport layer is pluggable. See [docs/providers/overview.md](docs/providers/overview.md).
 
 ## Commands
 
@@ -84,7 +92,7 @@ A stash is a folder with a `.stash/` directory that stores connection config and
 
 We recommend you avoid using `.git/` and Stash simultaneously. Stash is its own syncing service, and simply uses GitHub as a remote to store files.
 
-*However*, you might really like git workflows, possess an insatiable rebellious streak, and still want to sync a stash with this tool and use git at the same time. If this is you, we recommend you **only use git locally**, and while **disable backgroud sync** (`stash stop`). Then you can create branches, use git, and only run `stash sync` manually when you have your changes safely merged back into main.
+_However_, you might really like git workflows, possess an insatiable rebellious streak, and still want to sync a stash with this tool and use git at the same time. If this is you, we recommend you **only use git locally**, and while **disable backgroud sync** (`stash stop`). Then you can create branches, use git, and only run `stash sync` manually when you have your changes safely merged back into main.
 
 Disable `.git/` protections by editing the config while in your stash folder:
 
